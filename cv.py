@@ -1,6 +1,9 @@
 # %% [markdown]
-# # Manipulação de Dados
-
+# # Mini-Projeto de Visão Computacional
+# ## Grupo Turing
+# ### Noel Viscome Eliezer
+# %% [markdown]
+# # Manipulação de Imagens
 # %% Módulos
 import os
 import pandas as pd
@@ -9,8 +12,6 @@ import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
 
-
-# %% Tarefa 1 – ler e  mostrar imagens
 # %% Pillow
 # funciona bem em notebooks mas não retorna como arrays
 def readImagePIL(filename, show=False):
@@ -58,7 +59,9 @@ def readImagePlot(filename, show=False):
         ax.axis('off')
         plt.show()
     return image
-readImage = readImageCV
+
+
+readImage = readImageCV             # alias para a função
 
 
 def viewImage(image):
@@ -72,8 +75,8 @@ def viewImage(image):
 # ## Visualizando a imagem
 # Usamos algumas imagens para testar
 # %%
-jpg = readImage(r'dataset/darth_vader/darth_vader_fandom1.JPEG')
-png = readImage(r'dataset/yoda/yoda_yoda13.PNG')
+jpg = readImage(r'Darth Vader/darth_vader_fandom1.JPEG')
+png = readImage(r'Yoda/yoda_fandom10.PNG')
 
 viewImage(jpg);
 viewImage(png);
@@ -152,13 +155,36 @@ def brightness(image, amount):
 
 
 # %%
-img = readImage(jpg, show=False)
-plt.imshow(flip(img, 'xy'))
-# %%
-plt.imshow(brightness(img, 0.7))
-# %%
-plt.imshow(brightness(img, 1.3))
+img = jpg
+viewImage(flip(img, 'xy'));
+viewImage(brightness(img, 0.7));
+viewImage(brightness(img, 1.3));
 # %% [markdown]
 # ## Filtros
 # Agora que manipulamos algumas imagens, vamos experimentar alguns filtros.
-#
+# Vamos implementar um box blur bem simples (referência: https://en.wikipedia.org/wiki/Kernel_(image_processing))
+
+
+def boxBlur(image, amount=1):
+    kernel = (1/9) * np.ones((3, 3))
+    blurred = cv2.filter2D(image, -1, kernel=kernel)
+    # itera sobre a imagem já borrada para aumentar o blur
+    for i in range(amount - 1):
+        blurred = cv2.filter2D(blurred, -1, kernel=kernel)
+    return blurred
+
+
+def sharpen(image, amount=1):
+    kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+    sharp = cv2.filter2D(image, -1, kernel=kernel)
+    for i in range(amount - 1):
+        sharp = cv2.filter2D(image, -1, kernel=sharp)
+    return sharp
+
+
+# %%
+viewImage(boxBlur(jpg));
+viewImage(sharpen(jpg));
+# usando filtros já embutidos no OpenCV
+viewImage(cv2.GaussianBlur(jpg, (0, 0), 1));
+viewImage(cv2.fastNlMeansDenoisingColored(jpg));
