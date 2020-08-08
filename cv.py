@@ -6,10 +6,12 @@
 # # Manipulação de Imagens
 # %% Módulos
 import os
-import pandas as pd
+import random
+import cv2
+import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
+from shutil import copy2
 from PIL import Image
 
 
@@ -203,14 +205,12 @@ viewImage(cv2.fastNlMeansDenoisingColored(jpg))
 # ---- train, test e validation em diretórios separados
 # %%
 def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd()):
-    from shutil import copy2
-    import random
     paths = ["Darth Vader", "Yoda", "Stormtrooper"]
     for path in paths:
         # criamos os diretórios caso não existam
-        train_dest = os.path.join("data", path, "train")
-        test_dest = os.path.join("data", path, "test")
-        validate_dest = os.path.join("data", path, "validation")
+        train_dest = os.path.join(root, "data", "train", path)
+        test_dest = os.path.join(root, "data", "test", path)
+        validate_dest = os.path.join(root, "data", "validation", path)
         os.makedirs(train_dest, exist_ok=True)
         os.makedirs(test_dest, exist_ok=True)
         os.makedirs(validate_dest, exist_ok=True)
@@ -228,8 +228,21 @@ def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd()):
             copy2(f, validate_dest)
         print(path + ":", len(train), "imagens de treino,", len(test),
               "imagens de teste, e", len(validate), "imagens de validação.")
+    return [os.path.join(root, "data", f) for f in ["train", "test", "validation"]]
 
 
 # %%
-train_test_val_split()
+paths = train_test_val_split()
+# %% [markdown]
+# ## Criando uma Rede Neural com PyTorch
+# ### Transformando imagens em tensores
+# %%
+transforms = torchvision.transforms.Compose([
+    torchvision.transforms.Resize((300, 300), Image.NEAREST),           # afeta de forma relevante?
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
+
+train, test, validation = (torchvision.datasets.ImageFolder(folder, transform=transforms) for folder in paths)
+
 # %%
