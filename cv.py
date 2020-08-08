@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
 
+
 # %% Pillow
 # funciona bem em notebooks mas não retorna como arrays
 def readImagePIL(filename, show=False):
@@ -41,7 +42,8 @@ def readImageCV(filename, flags=cv2.IMREAD_COLOR, show=False):
         cv2.imshow('img', image)
         cv2.waitKey(0)                                  # pra não travar aaaa
         cv2.destroyAllWindows()                         # ainda trava
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)       # retorna imagem convertida
+    # retorna imagem convertida
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
 # %% matplotlib
@@ -78,8 +80,8 @@ def viewImage(image):
 jpg = readImage(r'Darth Vader/darth_vader_fandom1.JPEG')
 png = readImage(r'Yoda/yoda_fandom10.PNG')
 
-viewImage(jpg);
-viewImage(png);
+viewImage(jpg)
+viewImage(png)
 # %% [markdown]
 # ## RGB vs YUV:
 # A função `toYUV()` converte RGB para YUV usando a matriz de cores especificada (BT.709 por padrão).
@@ -156,9 +158,9 @@ def brightness(image, amount):
 
 # %%
 img = jpg
-viewImage(flip(img, 'xy'));
-viewImage(brightness(img, 0.7));
-viewImage(brightness(img, 1.3));
+viewImage(flip(img, 'xy'))
+viewImage(brightness(img, 0.7))
+viewImage(brightness(img, 1.3))
 # %% [markdown]
 # ## Filtros
 # Agora que manipulamos algumas imagens, vamos experimentar alguns filtros.
@@ -183,8 +185,51 @@ def sharpen(image, amount=1):
 
 
 # %%
-viewImage(boxBlur(jpg));
-viewImage(sharpen(jpg));
+viewImage(boxBlur(jpg))
+viewImage(sharpen(jpg))
 # usando filtros já embutidos no OpenCV
-viewImage(cv2.GaussianBlur(jpg, (0, 0), 1));
-viewImage(cv2.fastNlMeansDenoisingColored(jpg));
+viewImage(cv2.GaussianBlur(jpg, (0, 0), 1))
+viewImage(cv2.fastNlMeansDenoisingColored(jpg))
+
+
+# %% [markdown]
+# # Classificação de Imagens
+# %% [markdown]
+# ## Organização de bases de treino e teste
+# As 3 pastas do dataset estão na mesma pasta do executável
+# O formato dos arquivos é a seguir:
+# `data`diretório base do dataset
+# -- um diretório específico para cada um dos personagems (Yoda, Darth Vader, Stormtrooper)
+# ---- train, test e validation em diretórios separados
+# %%
+def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd()):
+    from shutil import copy2
+    import random
+    paths = ["Darth Vader", "Yoda", "Stormtrooper"]
+    for path in paths:
+        # criamos os diretórios caso não existam
+        train_dest = os.path.join("data", path, "train")
+        test_dest = os.path.join("data", path, "test")
+        validate_dest = os.path.join("data", path, "validation")
+        os.makedirs(train_dest, exist_ok=True)
+        os.makedirs(test_dest, exist_ok=True)
+        os.makedirs(validate_dest, exist_ok=True)
+
+        files = os.listdir(path)
+        files = [os.path.join(path, f) for f in files if f.endswith(
+            (".jpg", ".png"))]      # garante apenas imagens
+        train, validate, test = np.split(random.sample(files, len(files)), [int(
+            (1-test_split-val_split)*len(files)), int((1-test_split)*len(files))])
+        for f in train:
+            copy2(f, train_dest)
+        for f in test:
+            copy2(f, test_dest)
+        for f in validate:
+            copy2(f, validate_dest)
+        print(path + ":", len(train), "imagens de treino,", len(test),
+              "imagens de teste, e", len(validate), "imagens de validação.")
+
+
+# %%
+train_test_val_split()
+# %%
