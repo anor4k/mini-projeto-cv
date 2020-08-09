@@ -8,9 +8,12 @@
 import os
 import random
 import cv2
-import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision import transforms, datasets
 from shutil import copy2
 from PIL import Image
 
@@ -237,12 +240,31 @@ paths = train_test_val_split()
 # ## Criando uma Rede Neural com PyTorch
 # ### Transformando imagens em tensores
 # %%
-transforms = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((300, 300), Image.NEAREST),           # afeta de forma relevante?
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+transform = transforms.Compose([
+    transforms.Resize((256, 256), Image.NEAREST),           # interpolação afeta de forma relevante?
+    transforms.ToTensor(),
+    transforms.Normalize((0, 0, 0), (1, 1, 1))
 ])
 
-train, test, validation = (torchvision.datasets.ImageFolder(folder, transform=transforms) for folder in paths)
+train, test, validation = (datasets.ImageFolder(folder, transform=transforms) for folder in paths)
 
+
+# %%
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)       # rever output channels, to usando 18 pq um outro tutorial usou
+        self.conv2 = nn.Conv2d(16, 64, kernel_size=5, stride=2, padding=2)
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(64 * 128 * 128, 128)                                     # não sei se isso tá certo? https://gist.github.com/gagejustins/76ab1f37b83684032566b276fe3a5289#file-outputsize-py
+        self.fc2 = nn.Linear(128, 3)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool1(x)
+        x = x.view(-1, 64 * 128 * 128)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 # %%
