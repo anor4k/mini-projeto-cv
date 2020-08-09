@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
-from torch import nn
+from torch import nn, optim
 from torchvision import transforms, datasets
 from shutil import copy2
 from PIL import Image
@@ -246,7 +246,10 @@ transform = transforms.Compose([
     transforms.Normalize((0, 0, 0), (1, 1, 1))
 ])
 
-train, test, validation = (datasets.ImageFolder(folder, transform=transforms) for folder in paths)
+train, test, validation = (datasets.ImageFolder(folder, transform=transform) for folder in paths)
+
+train_loader = torch.utils.data.DataLoader(train, batch_size=32, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test, batch_size=32, shuffle=False)
 
 
 # %%
@@ -256,15 +259,51 @@ class CNN(nn.Module):
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)       # rever output channels, to usando 18 pq um outro tutorial usou
         self.conv2 = nn.Conv2d(16, 64, kernel_size=5, stride=2, padding=2)
         self.pool1 = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 128 * 128, 128)                                     # não sei se isso tá certo? https://gist.github.com/gagejustins/76ab1f37b83684032566b276fe3a5289#file-outputsize-py
+        self.fc1 = nn.Linear(64 * 64 * 64, 128)                                     # não sei se isso tá certo? https://gist.github.com/gagejustins/76ab1f37b83684032566b276fe3a5289#file-outputsize-py
         self.fc2 = nn.Linear(128, 3)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = self.pool1(x)
-        x = x.view(-1, 64 * 128 * 128)
+        x = x.view(-1, 64 * 64 * 64)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
+
+
+cnn = CNN()
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(cnn.parameters())
+# %%
+# Treinando a rede
+for epoch in range(2):
+    running_loss = 0.0
+    for i, data in enumerate(train_loader):
+        inputs, labels = data
+        optimizer.zero_grad()
+        outputs = cnn(inputs)
+        # print(inputs.shape, labels.shape, outputs.shape)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
+        # visualização do treinamento
+        print('[%d, %4d] loss: %.3f' % (epoch + 1, i + 1, running_loss))
+
+
+# %%
+# Testando a rede
+correct = 0
+total = 0
+with torch.no_grad():
+    for data in test_loader:
+        images, labels = data
+        outputs = cnn(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+print('Precisão da rede nas imagens de teste: %d%%' % (100 * correct / total))
+
 # %%
