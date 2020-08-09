@@ -207,7 +207,7 @@ viewImage(cv2.fastNlMeansDenoisingColored(jpg))
 # -- um diretório específico para cada um dos personagems (Yoda, Darth Vader, Stormtrooper)
 # ---- train, test e validation em diretórios separados
 # %%
-def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd()):
+def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd(), noop=False):
     paths = ["Darth Vader", "Yoda", "Stormtrooper"]
     for path in paths:
         # criamos os diretórios caso não existam
@@ -223,23 +223,28 @@ def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd()):
             (".jpg", ".png"))]      # garante apenas imagens
         train, validate, test = np.split(random.sample(files, len(files)), [int(
             (1-test_split-val_split)*len(files)), int((1-test_split)*len(files))])
-        for f in train:
-            copy2(f, train_dest)
-        for f in test:
-            copy2(f, test_dest)
-        for f in validate:
-            copy2(f, validate_dest)
+        # noop=True para evitar copiar novamente os arquivos
+        if not noop:
+            for f in train:
+                copy2(f, train_dest)
+            for f in test:
+                copy2(f, test_dest)
+            for f in validate:
+                copy2(f, validate_dest)
         print(path + ":", len(train), "imagens de treino,", len(test),
               "imagens de teste, e", len(validate), "imagens de validação.")
     return [os.path.join(root, "data", f) for f in ["train", "test", "validation"]]
 
 
 # %%
-paths = train_test_val_split()
+# mudar para noop=False para copiar os arquivos; noop=True retorna apenas os diretórios
+paths = train_test_val_split(noop=True)
 # %% [markdown]
 # ## Criando uma Rede Neural com PyTorch
 # ### Transformando imagens em tensores
 # %%
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 transform = transforms.Compose([
     transforms.Resize((256, 256), Image.NEAREST),           # interpolação afeta de forma relevante?
     transforms.ToTensor(),
@@ -273,15 +278,16 @@ class CNN(nn.Module):
 
 
 cnn = CNN()
+cnn.to(device)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(cnn.parameters())
 # %%
 # Treinando a rede
-for epoch in range(2):
+for epoch in range(10):
     running_loss = 0.0
     for i, data in enumerate(train_loader):
-        inputs, labels = data
+        inputs, labels = data[0].to(device), data[1].to(device)
         optimizer.zero_grad()
         outputs = cnn(inputs)
         # print(inputs.shape, labels.shape, outputs.shape)
@@ -290,7 +296,8 @@ for epoch in range(2):
         optimizer.step()
         running_loss += loss.item()
         # visualização do treinamento
-        print('[%d, %4d] loss: %.3f' % (epoch + 1, i + 1, running_loss))
+        if i % 20 == 19:
+            print('[%d, %4d] loss: %.3f' % (epoch + 1, i + 1, running_loss))
 
 
 # %%
@@ -299,7 +306,7 @@ correct = 0
 total = 0
 with torch.no_grad():
     for data in test_loader:
-        images, labels = data
+        images, labels = data[0].to(device), data[1].to(device)
         outputs = cnn(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
