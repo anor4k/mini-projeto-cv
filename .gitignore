@@ -2,4 +2,5 @@
 *
 !.gitignore
 !cv.py
+!cv.ipynb
 !README.md
