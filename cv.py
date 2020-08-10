@@ -239,41 +239,55 @@ def train_test_val_split(test_split=0.15, val_split=0.15, root=os.getcwd(), noop
 # %%
 # mudar para noop=False para copiar os arquivos; noop=True retorna apenas os diretórios
 paths = train_test_val_split(noop=True)
+classes = ["Darth Vader", "Stormtrooper", "Yoda"]    # ordem alfabética
+
 # %% [markdown]
 # ## Criando uma Rede Neural com PyTorch
 # ### Transformando imagens em tensores
 # %%
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-transform = transforms.Compose([
+train_transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomCrop(64, padding=4),
     transforms.Resize((256, 256), Image.NEAREST),           # interpolação afeta de forma relevante?
     transforms.ToTensor(),
     transforms.Normalize((0, 0, 0), (1, 1, 1))
 ])
 
-train, test, validation = (datasets.ImageFolder(folder, transform=transform) for folder in paths)
+test_transform = transforms.Compose([
+    transforms.Resize((256, 256), Image.NEAREST),           # interpolação afeta de forma relevante?
+    transforms.ToTensor(),
+    transforms.Normalize((0, 0, 0), (1, 1, 1))
+])
+
+train = datasets.ImageFolder(paths[0], transform=train_transform)
+test, validation = (datasets.ImageFolder(folder, transform=test_transform) for folder in paths[1:])
 
 train_loader = torch.utils.data.DataLoader(train, batch_size=32, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test, batch_size=32, shuffle=False)
+validation_loader = torch.utils.data.DataLoader(validation, batch_size=32, shuffle=False)
 
 
 # %%
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)       # rever output channels, to usando 18 pq um outro tutorial usou
-        self.conv2 = nn.Conv2d(16, 64, kernel_size=5, stride=2, padding=2)
+        self.conv1 = nn.Conv2d(3, 8, kernel_size=3, stride=1, padding=1)       # rever output channels, to usando 18 pq um outro tutorial usou
+        self.conv2 = nn.Conv2d(8, 32, kernel_size=5, stride=2, padding=2)
         self.pool1 = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 64 * 64, 128)                                     # não sei se isso tá certo? https://gist.github.com/gagejustins/76ab1f37b83684032566b276fe3a5289#file-outputsize-py
-        self.fc2 = nn.Linear(128, 3)
+        self.fc1 = nn.Linear(32 * 64 * 64, 128)                                # não sei se isso tá certo? https://gist.github.com/gagejustins/76ab1f37b83684032566b276fe3a5289#file-outputsize-py
+        self.fc2 = nn.Linear(128, 32)
+        self.fc3 = nn.Linear(32, 3)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = self.pool1(x)
-        x = x.view(-1, 64 * 64 * 64)
+        x = x.view(-1, 32 * 64 * 64)
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
 
 
@@ -281,10 +295,10 @@ cnn = CNN()
 cnn.to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(cnn.parameters())
+optimizer = optim.Adam(cnn.parameters(), lr=0.01)
 # %%
 # Treinando a rede
-for epoch in range(10):
+for epoch in range(5):
     running_loss = 0.0
     for i, data in enumerate(train_loader):
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -296,8 +310,24 @@ for epoch in range(10):
         optimizer.step()
         running_loss += loss.item()
         # visualização do treinamento
-        if i % 20 == 19:
+        if i % 10 == 9:
             print('[%d, %4d] loss: %.3f' % (epoch + 1, i + 1, running_loss))
+
+
+# %%
+# Validando a rede
+correct = 0
+total = 0
+with torch.no_grad():
+    for i, data in enumerate(validation_loader):
+        images, labels = data[0].to(device), data[1].to(device)
+        outputs = cnn(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        # viewImage(transforms.ToPILImage()(images[0].cpu()).convert('RGB'))
+        # print("Predição:", classes[predicted[0]], "Label:",classes[labels[0]])
+print('Precisão da rede nas imagens de validação: %.3f%%' % (100.000 * correct / total))
 
 
 # %%
@@ -305,12 +335,17 @@ for epoch in range(10):
 correct = 0
 total = 0
 with torch.no_grad():
-    for data in test_loader:
+    for i, data in enumerate(test_loader):
         images, labels = data[0].to(device), data[1].to(device)
         outputs = cnn(images)
+        print(outputs)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
-print('Precisão da rede nas imagens de teste: %d%%' % (100 * correct / total))
+        # viewImage(transforms.ToPILImage()(images[0].cpu()).convert('RGB'))
+        print(classes[c] for c in predicted.cpu())
+        # print("Predição:", classes[predicted[0]], "Label:",classes[labels[0]])
+print('Precisão da rede nas imagens de teste: %.3f%%' % (100.000 * correct / total))
+
 
 # %%
